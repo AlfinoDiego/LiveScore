@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin Panel - Live Score</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; font-family: Arial, Helvetica, sans-serif; }
+  body { background: #f4f5f7; color: #222; padding: 20px; font-size: 14px; }
+  .wrap { max-width: 860px; margin: 0 auto; }
+  .topbar { background: #fff; border: 1px solid #ddd; border-radius: 6px; padding: 14px 18px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+  .topbar h1 { font-size: 16px; font-weight: bold; }
+  .topbar a { font-size: 13px; color: #0b5ed7; text-decoration: none; border: 1px solid #0b5ed7; padding: 6px 12px; border-radius: 4px; }
+  .topbar a:hover { background: #0b5ed7; color: #fff; }
+  .card { background: #fff; border: 1px solid #ddd; border-radius: 6px; padding: 16px 18px; margin-bottom: 14px; }
+  .card h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; color: #666; margin-bottom: 12px; border-bottom: 1px solid #eee; padding-bottom: 8px; }
+  label { display: block; font-size: 12px; color: #555; margin-bottom: 4px; margin-top: 10px; }
+  input[type="text"], input[type="number"] { width: 100%; padding: 8px 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; outline: none; }
+  input:focus { border-color: #0b5ed7; }
+  .row { display: flex; gap: 12px; flex-wrap: wrap; }
+  .row > div { flex: 1; min-width: 180px; }
+  .btn { display: inline-block; padding: 8px 14px; border: 1px solid #bbb; background: #f8f8f8; color: #222; border-radius: 4px; cursor: pointer; font-size: 13px; margin: 4px 4px 0 0; }
+  .btn:hover { background: #eaeaea; }
+  .btn-primary { background: #0b5ed7; color: #fff; border-color: #0b5ed7; }
+  .btn-primary:hover { background: #0a53be; }
+  .btn-danger { background: #d93535; color: #fff; border-color: #d93535; }
+  .btn-danger:hover { background: #bf2c2c; }
+  .btn-plus { background: #1a7f37; color: #fff; border-color: #1a7f37; }
+  .btn-plus:hover { background: #146a2d; }
+  .btn-minus { background: #d93535; color: #fff; border-color: #d93535; }
+  .btn-minus:hover { background: #bf2c2c; }
+  .score-input-row { display: flex; align-items: center; gap: 10px; margin-top: 6px; }
+  .score-input-row input[type="number"] { width: 90px; font-size: 20px; text-align: center; font-weight: bold; }
+  .timer-display { font-family: "Courier New", monospace; font-size: 26px; font-weight: bold; background: #1b2a41; color: #e8b93b; border: 1px solid #ddd; padding: 10px 16px; border-radius: 4px; display: inline-block; margin-bottom: 8px; letter-spacing: 2px; }
+  .status { font-size: 12px; color: #666; margin-top: 8px; }
+  .status.ok { color: #1a7f37; }
+  .status.err { color: #d93535; }
+
+  .preview-score { display: flex; align-items: center; justify-content: space-between; background: #1b2a41; color: #fff; border-radius: 8px; padding: 16px 20px; }
+  .preview-score .t { text-align: center; flex: 1; }
+  .preview-score .t .nm { font-size: 12px; color: #b9c4d4; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 1px; min-height: 16px; }
+  .preview-score .t .sc { font-size: 36px; font-weight: 800; font-family: "Courier New", monospace; }
+  .preview-score .vs { font-size: 11px; color: #b9c4d4; padding: 0 12px; }
+  .preview-tournament { text-align: center; color: #b9c4d4; font-size: 12px; margin-top: 10px; letter-spacing: 1px; }
+
+  .chat-admin-box { border: 1px solid #ddd; border-radius: 6px; overflow: hidden; }
+  .chat-admin-head { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: #faf8f3; border-bottom: 1px solid #ddd; font-size: 12px; color: #666; }
+  .chat-admin-head strong { color: #1b2a41; }
+  .chat-admin-list { height: 280px; overflow-y: auto; padding: 10px 12px; background: #faf8f3; display: flex; flex-direction: column; gap: 6px; }
+  .chat-admin-item { font-size: 12.5px; line-height: 1.4; word-break: break-word; display: flex; gap: 6px; align-items: flex-start; padding: 4px 6px; border-radius: 4px; }
+  .chat-admin-item:hover { background: #f0ece3; }
+  .chat-admin-item .cnt { flex: 1; }
+  .chat-admin-item .nm { font-weight: 700; margin-right: 4px; color: #1b2a41; }
+  .chat-admin-item .nm.admin { color: #d93535; }
+  .chat-admin-item .tm { font-size: 10px; color: #999; margin-left: 6px; }
+  .chat-admin-item .del {
+    flex-shrink: 0; background: transparent; border: 1px solid #f5c2c2; color: #d93535;
+    border-radius: 4px; padding: 2px 8px; font-size: 10px; cursor: pointer;
+  }
+  .chat-admin-item .del:hover { background: #d93535; color: #fff; border-color: #d93535; }
+  .chat-admin-empty { text-align: center; font-size: 12px; color: #999; padding: 30px 0; }
+  .chat-admin-form { display: flex; gap: 6px; padding: 8px; border-top: 1px solid #ddd; background: #fff; }
+  .chat-admin-form input { flex: 1; padding: 8px 10px; border: 1px solid #ddd; border-radius: 18px; font-size: 12.5px; outline: none; }
+  .chat-admin-form input:focus { border-color: #0b5ed7; }
+  .chat-admin-form button { padding: 8px 16px; border-radius: 18px; border: none; background: #1b2a41; color: #fff; cursor: pointer; font-size: 12px; font-weight: 600; }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <div class="topbar">
+    <h1>Admin Panel — Live Score</h1>
+    <a href="penonton.html" target="_blank">Buka Dashboard Penonton ↗</a>
+  </div>
+
+  <!-- PREVIEW SKOR -->
+  <div class="card">
+    <h2>Skor Live (Preview)</h2>
+    <div class="preview-score">
+      <div class="t"><div class="nm" id="prevNameA">Tim A</div><div class="sc" id="prevScoreA">0</div></div>
+      <div class="vs">VS</div>
+      <div class="t"><div class="nm" id="prevNameB">Tim B</div><div class="sc" id="prevScoreB">0</div></div>
+    </div>
+    <div class="preview-tournament" id="prevTournament">Pertandingan Persahabatan</div>
+  </div>
+
+  <!-- INFO PERTANDINGAN -->
+  <div class="card">
+    <h2>Info Pertandingan</h2>
+    <div class="row">
+      <div><label>Nama Tim A</label><input type="text" id="nameA" placeholder="Tim A"></div>
+      <div><label>Nama Tim B</label><input type="text" id="nameB" placeholder="Tim B"></div>
+    </div>
+    <div class="row">
+      <div><label>Nama Turnamen / Keterangan</label><input type="text" id="tournament" placeholder="Pertandingan Persahabatan"></div>
+    </div>
+  </div>
+
+  <!-- SKOR -->
+  <div class="card">
+    <h2>Skor</h2>
+    <div class="row">
+      <div>
+        <label>Skor Tim A</label>
+        <div class="score-input-row">
+          <input type="number" id="scoreA" value="0" min="0">
+          <button class="btn btn-plus" onclick="addScore('A',1)">+1</button>
+          <button class="btn btn-minus" onclick="addScore('A',-1)">-1</button>
+        </div>
+      </div>
+      <div>
+        <label>Skor Tim B</label>
+        <div class="score-input-row">
+          <input type="number" id="scoreB" value="0" min="0">
+          <button class="btn btn-plus" onclick="addScore('B',1)">+1</button>
+          <button class="btn btn-minus" onclick="addScore('B',-1)">-1</button>
+        </div>
+      </div>
+    </div>
+    <div style="margin-top:12px">
+      <button class="btn btn-danger" onclick="resetScore()">Reset Skor</button>
+    </div>
+  </div>
+
+  <!-- WAKTU -->
+  <div class="card">
+    <h2>Waktu Pertandingan</h2>
+    <div class="timer-display" id="timerView">00:00</div>
+    <div style="margin-top:8px">
+      <button class="btn btn-primary" onclick="startTimer()">Mulai</button>
+      <button class="btn" onclick="pauseTimer()">Pause</button>
+      <button class="btn" onclick="resetTimer()">Reset Waktu</button>
+    </div>
+    <label style="margin-top:14px">Set Waktu Manual (menit:detik)</label>
+    <div class="row">
+      <div style="max-width:80px"><input type="number" id="setMin" value="0" min="0" placeholder="Menit"></div>
+      <div style="max-width:80px"><input type="number" id="setSec" value="0" min="0" max="59" placeholder="Detik"></div>
+      <div style="flex:0 0 auto; display:flex; align-items:flex-end">
+        <button class="btn" onclick="applyManualTime()">Terapkan</button>
+      </div>
+    </div>
+    <div style="margin-top:14px; padding-top:14px; border-top: 1px solid #eee;">
+      <label style="margin-top:0">Status Pertandingan</label>
+      <button class="btn btn-danger" onclick="finishMatch()">🏁 Akhiri Pertandingan</button>
+      <button class="btn btn-primary" onclick="reopenMatch()">↺ Buka Lagi</button>
+    </div>
+  </div>
+
+  <!-- CHAT ADMIN -->
+  <div class="card">
+    <h2>Chat Live — Moderasi</h2>
+    <div class="chat-admin-box">
+      <div class="chat-admin-head">
+        <span><strong>💬 Komentar Live</strong> — admin bisa hapus pesan</span>
+        <button class="btn btn-danger" style="margin:0;padding:4px 10px;font-size:11px" onclick="resetAllChat()">Reset Semua Chat</button>
+      </div>
+      <div class="chat-admin-list" id="chatAdminList">
+        <div class="chat-admin-empty">Belum ada pesan.</div>
+      </div>
+      <div class="chat-admin-form">
+        <input type="text" id="adminChatMsg" placeholder="Kirim sebagai ADMIN..." maxlength="200" onkeydown="if(event.key==='Enter')sendAdminChat()">
+        <button onclick="sendAdminChat()">Kirim</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- PARLAY MONITOR -->
+  <div class="card">
+    <h2>Parlay — Tebakan Penonton</h2>
+    <div class="chat-admin-box">
+      <div class="chat-admin-list" id="parlayAdminList" style="height:160px">
+        <div class="chat-admin-empty">Belum ada tebakan parlay.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STATUS -->
+  <div class="card">
+    <h2>Status</h2>
+    <div class="status" id="status">Menghubungkan...</div>
+    <div style="margin-top:12px">
+      <button class="btn btn-danger" onclick="resetAll()">Reset Seluruh Pertandingan</button>
+    </div>
+  </div>
+
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getDatabase, ref, set, onValue, update, push, remove, query, limitToLast, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBz_-9_wGpxFvoOV7mjG-bo9R7cBDLPh1c",
+  authDomain: "lvsc-d619e.firebaseapp.com",
+  databaseURL: "https://lvsc-d619e-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "lvsc-d619e",
+  storageBucket: "lvsc-d619e.firebasestorage.app",
+  messagingSenderId: "1093402057198",
+  appId: "1:1093402057198:web:f1d07b2e435569120c16ff",
+  measurementId: "G-MYN6J1HLKD"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+const scoreRef = ref(db, 'livescore');
+const chatRef = ref(db, 'chat');
+const parlayRef = ref(db, 'parlay');
+
+const ADMIN_ID = 'admin_fixed';
+const ADMIN_NAME = 'ADMIN';
+
+let localData = { nameA:'', nameB:'', tournament:'', scoreA:0, scoreB:0, seconds:0, matchStatus:'live' };
+let isConnected = false;
+let tickInterval = null;
+let editingNameA = false, editingNameB = false, editingTour = false;
+
+function setStatus(text, type) {
+  const el = document.getElementById('status');
+  el.textContent = text;
+  el.className = 'status' + (type ? ' ' + type : '');
+}
+
+/* ============ LOAD ============ */
+onValue(scoreRef, (snapshot) => {
+  const d = snapshot.val();
+  if (!d) {
+    set(scoreRef, {
+      nameA: 'Tim A', nameB: 'Tim B',
+      tournament: 'Pertandingan Persahabatan',
+      scoreA: 0, scoreB: 0, seconds: 0,
+      matchStatus: 'live'
+    });
+    return;
+  }
+  localData = d;
+  isConnected = true;
+
+  document.getElementById('prevNameA').textContent = d.nameA || '—';
+  document.getElementById('prevNameB').textContent = d.nameB || '—';
+  document.getElementById('prevScoreA').textContent = d.scoreA || 0;
+  document.getElementById('prevScoreB').textContent = d.scoreB || 0;
+  document.getElementById('prevTournament').textContent = d.tournament || '';
+
+  document.getElementById('scoreA').value = d.scoreA || 0;
+  document.getElementById('scoreB').value = d.scoreB || 0;
+
+  renderTimer();
+
+  if (!editingNameA) document.getElementById('nameA').value = d.nameA != null ? d.nameA : '';
+  if (!editingNameB) document.getElementById('nameB').value = d.nameB != null ? d.nameB : '';
+  if (!editingTour) document.getElementById('tournament').value = d.tournament != null ? d.tournament : '';
+
+  setStatus('Terhubung ✓ | Status: ' + (d.matchStatus || 'live').toUpperCase(), 'ok');
+}, (error) => setStatus('Error: ' + error.message, 'err'));
+
+function renderTimer() {
+  const sec = localData.seconds || 0;
+  const m = String(Math.floor(sec / 60)).padStart(2, '0');
+  const s = String(sec % 60).padStart(2, '0');
+  document.getElementById('timerView').textContent = m + ':' + s;
+}
+
+function pushUpdate(partial) {
+  if (!isConnected) return Promise.resolve();
+  localData = Object.assign({}, localData, partial);
+  return update(scoreRef, partial).catch(err => setStatus('Gagal: ' + err.message, 'err'));
+}
+
+/* ============ NAMA ============ */
+const inputNameA = document.getElementById('nameA');
+const inputNameB = document.getElementById('nameB');
+const inputTour = document.getElementById('tournament');
+inputNameA.addEventListener('focus', () => editingNameA = true);
+inputNameA.addEventListener('blur', () => editingNameA = false);
+inputNameB.addEventListener('focus', () => editingNameB = true);
+inputNameB.addEventListener('blur', () => editingNameB = false);
+inputTour.addEventListener('focus', () => editingTour = true);
+inputTour.addEventListener('blur', () => editingTour = false);
+inputNameA.addEventListener('input', e => pushUpdate({ nameA: e.target.value }));
+inputNameB.addEventListener('input', e => pushUpdate({ nameB: e.target.value }));
+inputTour.addEventListener('input', e => pushUpdate({ tournament: e.target.value }));
+
+/* ============ SKOR ============ */
+document.getElementById('scoreA').addEventListener('input', e => pushUpdate({ scoreA: Math.max(0, parseInt(e.target.value) || 0) }));
+document.getElementById('scoreB').addEventListener('input', e => pushUpdate({ scoreB: Math.max(0, parseInt(e.target.value) || 0) }));
+
+function addScore(team, delta) {
+  const key = team === 'A' ? 'scoreA' : 'scoreB';
+  const cur = parseInt(localData[key]) || 0;
+  const nv = Math.max(0, cur + delta);
+  localData[key] = nv;
+  document.getElementById(key).value = nv;
+  document.getElementById('prevScore' + team).textContent = nv;
+  update(scoreRef, { [key]: nv }).catch(err => setStatus('Gagal: ' + err.message, 'err'));
+}
+function resetScore() {
+  if (!confirm('Reset skor?')) return;
+  pushUpdate({ scoreA: 0, scoreB: 0 });
+}
+
+/* ============ TIMER ============ */
+function startTimer() {
+  if (tickInterval) return;
+  tickInterval = setInterval(() => {
+    const nv = (parseInt(localData.seconds) || 0) + 1;
+    localData.seconds = nv;
+    renderTimer();
+    update(scoreRef, { seconds: nv }).catch(() => {});
+  }, 1000);
+  setStatus('Timer jalan...', 'ok');
+}
+function pauseTimer() {
+  if (tickInterval) { clearInterval(tickInterval); tickInterval = null; setStatus('Timer dijeda.', 'ok'); }
+}
+function resetTimer() { pauseTimer(); pushUpdate({ seconds: 0 }); }
+function applyManualTime() {
+  const m = parseInt(document.getElementById('setMin').value) || 0;
+  const s = parseInt(document.getElementById('setSec').value) || 0;
+  pushUpdate({ seconds: m * 60 + s });
+}
+
+/* ============ MATCH STATUS ============ */
+function finishMatch() {
+  if (!confirm('Akhiri pertandingan? Penonton tidak bisa submit parlay lagi, dan hasil parlay akan dinilai.')) return;
+  pauseTimer();
+  pushUpdate({ matchStatus: 'finished' }).then(() => setStatus('Pertandingan selesai. Parlay dinilai.', 'ok'));
+}
+function reopenMatch() {
+  if (!confirm('Buka pertandingan lagi? matchStatus kembali "live".')) return;
+  pushUpdate({ matchStatus: 'live' });
+}
+window.finishMatch = finishMatch;
+window.reopenMatch = reopenMatch;
+
+/* ============ RESET ALL ============ */
+function resetAll() {
+  if (!confirm('Reset pertandingan + chat + parlay?')) return;
+  pauseTimer();
+  set(scoreRef, {
+    nameA: 'Tim A', nameB: 'Tim B',
+    tournament: 'Pertandingan Persahabatan',
+    scoreA: 0, scoreB: 0, seconds: 0,
+    matchStatus: 'live'
+  });
+  remove(chatRef).catch(() => {});
+  remove(parlayRef).catch(() => {});
+  setStatus('Semua direset (skor + chat + parlay).', 'ok');
+}
+
+/* ============ CHAT ============ */
+const chatAdminList = document.getElementById('chatAdminList');
+const adminChatMsg = document.getElementById('adminChatMsg');
+const chatQuery = query(chatRef, limitToLast(40));
+
+onValue(chatQuery, (snapshot) => {
+  const data = snapshot.val();
+  chatAdminList.innerHTML = '';
+  if (!data) { chatAdminList.innerHTML = '<div class="chat-admin-empty">Belum ada pesan.</div>'; return; }
+  const msgs = Object.entries(data).map(([k, v]) => ({ ...v, id: k })).sort((a, b) => (a.time || 0) - (b.time || 0));
+  const near = chatAdminList.scrollHeight - chatAdminList.scrollTop - chatAdminList.clientHeight < 60;
+  msgs.forEach(msg => {
+    const isAdmin = msg.uid === ADMIN_ID;
+    const time = msg.time ? new Date(msg.time).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '';
+    const div = document.createElement('div');
+    div.className = 'chat-admin-item';
+    div.innerHTML = `
+      <div class="cnt">
+        <span class="nm ${isAdmin ? 'admin' : ''}">${escapeHtml(msg.name || 'Anonymous')}:</span>
+        <span>${escapeHtml(msg.text)}</span>
+        <span class="tm">${time}</span>
+      </div>
+      <button class="del" onclick="deleteChat('${msg.id}')">🗑</button>
+    `;
+    chatAdminList.appendChild(div);
+  });
+  if (near) chatAdminList.scrollTop = chatAdminList.scrollHeight;
+});
+
+function sendAdminChat() {
+  const t = adminChatMsg.value.trim();
+  if (!t) return;
+  push(chatRef, { name: ADMIN_NAME, text: t.slice(0, 200), uid: ADMIN_ID, time: serverTimestamp() })
+    .then(() => { adminChatMsg.value = ''; adminChatMsg.focus(); })
+    .catch(err => alert('Gagal kirim: ' + err.message + '\n\nCek Rules Firebase: "chat": { ".read": true, ".write": true }'));
+}
+function deleteChat(id) {
+  if (!confirm('Hapus pesan ini?')) return;
+  remove(ref(db, 'chat/' + id)).catch(err => alert('Gagal: ' + err.message));
+}
+function resetAllChat() {
+  if (!confirm('Hapus SEMUA chat?')) return;
+  remove(chatRef).catch(err => alert('Gagal: ' + err.message));
+}
+
+/* ============ PARLAY MONITOR ============ */
+const parlayListEl = document.getElementById('parlayAdminList');
+onValue(parlayRef, (snapshot) => {
+  const data = snapshot.val();
+  parlayListEl.innerHTML = '';
+  if (!data) { parlayListEl.innerHTML = '<div class="chat-admin-empty">Belum ada tebakan parlay.</div>'; return; }
+  const items = Object.values(data).sort((a, b) => (a.time || 0) - (b.time || 0));
+  items.forEach(p => {
+    const div = document.createElement('div');
+    div.className = 'chat-admin-item';
+    div.innerHTML = `<div class="cnt"><span class="nm">${escapeHtml(p.name || 'Anonymous')}:</span> <strong>${p.guessA} : ${p.guessB}</strong></div>`;
+    parlayListEl.appendChild(div);
+  });
+});
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' })[c]);
+}
+
+window.deleteChat = deleteChat;
+window.resetAllChat = resetAllChat;
+window.sendAdminChat = sendAdminChat;
+</script>
+</body>
+</html>

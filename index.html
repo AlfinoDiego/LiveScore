@@ -1,0 +1,792 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Live Score</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Arial, sans-serif; -webkit-tap-highlight-color: transparent; }
+  :root { --navy: #1b2a41; --navy-soft: #24354f; --gold: #e8b93b; --cream: #f7f4ee; --ink: #2b2b2b; --muted: #7a7a7a; --line: #e2ddd2; --green: #2e7d4f; --red: #d93535; }
+  body { background: var(--cream); color: var(--ink); min-height: 100vh; display: flex; justify-content: center; align-items: flex-start; padding: 16px 14px 90px; font-size: 14px; overflow-x: hidden; }
+
+  #loading { position: fixed; inset: 0; background: var(--navy); color: #fff; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 9999; transition: opacity .5s, visibility .5s; }
+  #loading.hide { opacity: 0; visibility: hidden; }
+  .ld-ball { width: 56px; height: 56px; border-radius: 50%; background: var(--gold); position: relative; animation: bounce .9s ease-in-out infinite; }
+  .ld-ball::before { content: ''; position: absolute; inset: 14px; border-radius: 50%; background: var(--navy); }
+  @keyframes bounce { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-18px); } }
+  .ld-title { margin-top: 24px; font-size: 16px; font-weight: 700; letter-spacing: 3px; }
+  .ld-sub { margin-top: 6px; font-size: 11px; color: #b9c4d4; letter-spacing: 2px; }
+  .ld-bar { margin-top: 22px; width: 160px; height: 3px; background: rgba(255,255,255,0.15); border-radius: 3px; overflow: hidden; }
+  .ld-fill { height: 100%; width: 0; background: var(--gold); animation: fill 1.6s ease forwards; }
+  @keyframes fill { to { width: 100%; } }
+
+  .wrap { width: 100%; max-width: 680px; }
+  .header { background: var(--navy); border-radius: 10px; padding: 14px 18px; display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; color: #fff; }
+  .brand { display: flex; align-items: center; gap: 10px; }
+  .logo { width: 40px; height: 40px; flex-shrink: 0; }
+  .brand-text .title { font-size: 14px; font-weight: 700; letter-spacing: 0.5px; }
+  .brand-text .sub { font-size: 10px; color: #b9c4d4; letter-spacing: 1.5px; text-transform: uppercase; }
+  .live-badge { display: flex; align-items: center; gap: 6px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); padding: 5px 9px; border-radius: 4px; font-size: 10px; font-weight: 700; letter-spacing: 1px; }
+  .live-badge .dot { width: 7px; height: 7px; border-radius: 50%; background: #ff4d4d; }
+  .live-badge .dot.stale { background: #c49a00; }
+  .live-badge .dot.off { background: #666; }
+  .live-badge .dot.finished { background: var(--gold); }
+
+  .scoreboard { background: #fff; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; box-shadow: 0 2px 8px rgba(27,42,65,0.05); margin-bottom: 14px; }
+  .tournament-name { text-align: center; padding: 10px 14px; font-size: 12px; color: var(--muted); border-bottom: 1px solid var(--line); background: #faf8f3; letter-spacing: 1px; text-transform: uppercase; font-weight: 600; min-height: 38px; display: flex; align-items: center; justify-content: center; }
+  .team-row { display: flex; align-items: stretch; }
+  .team { flex: 1; padding: 26px 16px; text-align: center; position: relative; overflow: visible; }
+  .team-a { border-right: 1px solid var(--line); }
+  .team .crest { width: 56px; height: 56px; margin: 0 auto 12px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 22px; color: #fff; }
+  .team-a .crest { background: var(--navy); }
+  .team-b .crest { background: var(--gold); color: var(--navy); }
+  .team .tname { font-size: 14px; font-weight: 700; margin-bottom: 10px; word-break: break-word; min-height: 20px; }
+  .team .tscore { font-size: 60px; font-weight: 800; color: var(--navy); font-family: "Courier New", monospace; line-height: 1; transition: transform .2s, color .2s; display: inline-block; position: relative; }
+  .team .tscore.pop { transform: scale(1.35); color: var(--gold); }
+  .team .tscore.flash-bg { animation: flashBg .6s ease; }
+  @keyframes flashBg { 0% { background: rgba(232,185,59,0.35); } 100% { background: transparent; } }
+
+  .timer-row { background: var(--navy-soft); color: #fff; padding: 14px; text-align: center; }
+  .timer-row .tlabel { font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: #b9c4d4; margin-bottom: 4px; }
+  .timer-row .tval { font-family: "Courier New", monospace; font-size: 26px; font-weight: 700; color: var(--gold); letter-spacing: 2px; }
+
+  /* SORAK DI BAWAH SKOR */
+  .cheer-section { background: #fff; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; margin-bottom: 14px; }
+  .cheer-head { padding: 10px 14px; background: #faf8f3; border-bottom: 1px solid var(--line); font-size: 12px; font-weight: 700; color: var(--navy); }
+  .cheer-body { padding: 12px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .cheer-btn2 { padding: 12px 6px; border-radius: 8px; border: 1px solid var(--line); background: #fff; cursor: pointer; font-size: 11px; font-weight: 600; color: var(--ink); transition: transform .1s; }
+  .cheer-btn2:hover { background: #faf8f3; }
+  .cheer-btn2:active { transform: scale(.94); }
+  .cheer-btn2 .em { display: block; font-size: 22px; margin-bottom: 3px; }
+
+  .ball-fly { position: fixed; font-size: 34px; pointer-events: none; z-index: 9998; transition: transform .55s cubic-bezier(.3,.9,.4,1), opacity .55s; }
+  .particle { position: fixed; pointer-events: none; z-index: 9998; font-size: 22px; animation: burst .9s ease-out forwards; }
+  @keyframes burst {
+    0% { opacity: 1; transform: translate(-50%, -50%) scale(.6); }
+    100% { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(1.4); }
+  }
+
+  .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; background: #fff; border-top: 1px solid var(--line); display: flex; z-index: 50; box-shadow: 0 -2px 8px rgba(0,0,0,0.04); }
+  .bottom-nav .nav-item { flex: 1; text-align: center; padding: 10px 4px 12px; font-size: 10px; color: var(--muted); cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 3px; }
+  .bottom-nav .nav-item .ico { font-size: 18px; line-height: 1; }
+  .bottom-nav .nav-item.active { color: var(--navy); font-weight: 700; }
+
+  .panel { display: none; }
+  .panel.active { display: block; animation: fadeIn .25s ease; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+  .card-box { background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 22px; }
+  .card-title { font-size: 15px; font-weight: 700; color: var(--navy); margin-bottom: 6px; }
+  .card-desc { font-size: 12px; color: var(--muted); margin-bottom: 18px; }
+
+  .game-tabs { display: flex; gap: 6px; margin-bottom: 14px; overflow-x: auto; }
+  .game-tab { padding: 8px 14px; border-radius: 6px; border: 1px solid var(--line); background: #fff; cursor: pointer; font-size: 12px; font-weight: 600; color: var(--muted); white-space: nowrap; }
+  .game-tab.active { background: var(--navy); color: #fff; border-color: var(--navy); }
+  .game-panel { display: none; }
+  .game-panel.active { display: block; }
+
+  .game-stats { display: flex; gap: 8px; justify-content: center; margin-bottom: 14px; }
+  .game-stat { background: #faf8f3; border: 1px solid var(--line); padding: 8px 14px; border-radius: 8px; min-width: 80px; text-align: center; }
+  .game-stat .lbl { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+  .game-stat .val { font-size: 18px; font-weight: 800; color: var(--navy); font-family: "Courier New", monospace; }
+
+  .tap-area { width: 100%; height: 170px; border-radius: 12px; border: 2px dashed var(--line); background: #faf8f3; display: flex; align-items: center; justify-content: center; flex-direction: column; cursor: pointer; user-select: none; transition: background .1s; }
+  .tap-area:active { background: #f0ece3; }
+  .tap-area .big { font-size: 44px; margin-bottom: 6px; }
+  .tap-area .txt { font-size: 12px; color: var(--muted); }
+  .game-timeleft { margin-top: 12px; font-size: 12px; color: var(--muted); text-align: center; }
+  .game-timeleft strong { color: var(--navy); font-family: "Courier New", monospace; }
+
+  /* PARLAY */
+  .parlay-live-score { text-align: center; background: #faf8f3; border: 1px solid var(--line); border-radius: 8px; padding: 12px; margin-bottom: 14px; }
+  .parlay-live-score .lbl { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+  .parlay-live-score .sc { font-family: "Courier New", monospace; font-size: 22px; font-weight: 800; color: var(--navy); }
+  .parlay-form { display: flex; gap: 8px; align-items: center; justify-content: center; margin: 14px 0; }
+  .parlay-input { width: 80px; padding: 12px; font-size: 24px; font-weight: 800; text-align: center; border: 2px solid var(--line); border-radius: 8px; font-family: "Courier New", monospace; outline: none; }
+  .parlay-input:focus { border-color: var(--gold); }
+  .parlay-vs { font-size: 14px; font-weight: 700; color: var(--muted); }
+  .parlay-btn { display: block; margin: 0 auto; padding: 12px 24px; border-radius: 8px; border: none; background: var(--navy); color: #fff; cursor: pointer; font-size: 13px; font-weight: 600; }
+  .parlay-btn:hover { background: var(--navy-soft); }
+  .parlay-btn:disabled { background: #999; cursor: not-allowed; }
+  .parlay-result { margin-top: 16px; padding: 16px; border-radius: 8px; font-size: 13px; text-align: center; display: none; }
+  .parlay-result.show { display: block; }
+  .parlay-result.win { background: #e6f4ea; color: var(--green); border: 1px solid #b7dfc3; }
+  .parlay-result.lose { background: #fdecec; color: var(--red); border: 1px solid #f5c2c2; }
+  .parlay-result.wait { background: #fff8e1; color: #c49a00; border: 1px solid #f5e5b3; }
+  .parlay-my { text-align: center; font-size: 12px; color: var(--muted); margin-top: 10px; }
+  .parlay-my strong { color: var(--navy); }
+
+  /* MEMORY */
+  .memory-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; max-width: 340px; margin: 14px auto; }
+  .mem-card { aspect-ratio: 1; border-radius: 8px; background: var(--navy); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 28px; color: #fff; transition: transform .2s, background .2s; user-select: none; }
+  .mem-card:hover { transform: scale(1.03); }
+  .mem-card.flipped { background: #fff; border: 2px solid var(--gold); color: var(--ink); }
+  .mem-card.matched { background: #e6f4ea; border: 2px solid var(--green); opacity: 0.7; }
+
+  .btn-reset-game { display: block; margin: 14px auto 0; padding: 8px 16px; border-radius: 6px; border: 1px solid var(--line); background: #fff; cursor: pointer; font-size: 12px; color: var(--muted); }
+  .btn-reset-game:hover { background: #f5f2eb; }
+
+  .sound-box { background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 18px; }
+  .sound-row { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--line); }
+  .sound-row:last-child { border-bottom: none; }
+  .sound-row .lbl { font-size: 13px; font-weight: 600; color: var(--ink); }
+  .sound-row .sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .switch { position: relative; width: 44px; height: 24px; flex-shrink: 0; }
+  .switch input { opacity: 0; width: 0; height: 0; }
+  .slider-sw { position: absolute; inset: 0; background: #ccc; border-radius: 24px; cursor: pointer; transition: background .2s; }
+  .slider-sw::before { content: ''; position: absolute; width: 18px; height: 18px; border-radius: 50%; background: #fff; left: 3px; top: 3px; transition: transform .2s; }
+  .switch input:checked + .slider-sw { background: var(--green); }
+  .switch input:checked + .slider-sw::before { transform: translateX(20px); }
+
+  .live-chat { background: #fff; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; display: flex; flex-direction: column; margin-bottom: 14px; }
+  .live-chat-header { padding: 10px 14px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center; background: #faf8f3; }
+  .live-chat-header .ttl { font-size: 12px; font-weight: 700; color: var(--navy); }
+  .live-chat-header .live-indicator { display: flex; align-items: center; gap: 5px; font-size: 10px; color: var(--red); font-weight: 700; letter-spacing: 1px; }
+  .live-chat-header .live-indicator::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--red); animation: blink 1.4s infinite; }
+  @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+  .chat-list { height: 200px; overflow-y: auto; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; background: #faf8f3; }
+  .chat-item { font-size: 12.5px; line-height: 1.4; word-break: break-word; padding: 4px 6px; border-radius: 4px; }
+  .chat-item.is-admin { background: #fff3e0; border-left: 3px solid var(--red); }
+  .chat-item .uname { font-weight: 700; color: var(--navy); margin-right: 4px; }
+  .chat-item.is-admin .uname { color: var(--red); }
+  .chat-item .utext { color: var(--ink); }
+  .chat-item .utime { font-size: 10px; color: var(--muted); margin-left: 6px; }
+  .chat-empty { text-align: center; font-size: 12px; color: var(--muted); padding: 30px 0; }
+  .chat-form { display: flex; gap: 6px; padding: 8px; border-top: 1px solid var(--line); background: #fff; }
+  .chat-form input.msg-in { flex: 1; padding: 10px 14px; border: 1px solid var(--line); border-radius: 20px; font-size: 13px; outline: none; }
+  .chat-form input:focus { border-color: var(--gold); }
+  .chat-form .send-btn { width: 38px; height: 38px; border-radius: 50%; border: none; background: var(--navy); color: #fff; cursor: pointer; font-size: 14px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .chat-form .send-btn:hover { background: var(--navy-soft); }
+  .chat-form .send-btn:active { transform: scale(0.94); }
+
+  .footer { text-align: center; margin-top: 18px; font-size: 11px; color: var(--muted); }
+  .footer strong { color: var(--navy); }
+
+  .emoji-float { position: fixed; font-size: 32px; pointer-events: none; z-index: 9997; animation: floatUp 1.2s ease-out forwards; }
+  @keyframes floatUp { 0% { opacity: 1; transform: translateY(0) scale(1); } 100% { opacity: 0; transform: translateY(-160px) scale(1.4); } }
+</style>
+</head>
+<body>
+
+<div id="loading">
+  <div class="ld-ball"></div>
+  <div class="ld-title">LIVE SCORE</div>
+  <div class="ld-sub">MADE BY ALFIENO</div>
+  <div class="ld-bar"><div class="ld-fill"></div></div>
+</div>
+
+<div class="wrap">
+
+  <div class="header">
+    <div class="brand">
+      <svg class="logo" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="32" cy="32" r="30" fill="#e8b93b"/>
+        <circle cx="32" cy="32" r="24" fill="#1b2a41"/>
+        <path d="M32 14 L36.5 26 L49 26 L39 33.5 L43 46 L32 38.5 L21 46 L25 33.5 L15 26 L27.5 26 Z" fill="#e8b93b"/>
+      </svg>
+      <div class="brand-text">
+        <div class="title">LIVE SCORE</div>
+        <div class="sub">Match Center</div>
+      </div>
+    </div>
+    <div class="live-badge">
+      <span class="dot" id="liveDot"></span>
+      <span id="liveLabel">MENGHUBUNGKAN</span>
+    </div>
+  </div>
+
+  <div class="panel active" id="panel-score">
+
+    <div class="scoreboard">
+      <div class="tournament-name" id="tournamentName">—</div>
+      <div class="team-row">
+        <div class="team team-a">
+          <div class="crest" id="crestA">A</div>
+          <div class="tname" id="nameA">Tim A</div>
+          <div class="tscore" id="scoreA">0</div>
+        </div>
+        <div class="team team-b">
+          <div class="crest" id="crestB">B</div>
+          <div class="tname" id="nameB">Tim B</div>
+          <div class="tscore" id="scoreB">0</div>
+        </div>
+      </div>
+      <div class="timer-row">
+        <div class="tlabel">Waktu Pertandingan</div>
+        <div class="tval" id="timer">00:00</div>
+      </div>
+    </div>
+
+    <!-- SORAK DI BAWAH SKOR -->
+    <div class="cheer-section">
+      <div class="cheer-head">📣 Sorak & Dukungan</div>
+      <div class="cheer-body">
+        <button class="cheer-btn2" onclick="cheer('👏')"><span class="em">👏</span>Tepuk</button>
+        <button class="cheer-btn2" onclick="cheer('🔥')"><span class="em">🔥</span>Keren</button>
+        <button class="cheer-btn2" onclick="cheer('⚽')"><span class="em">⚽</span>Gol</button>
+        <button class="cheer-btn2" onclick="cheer('💪')"><span class="em">💪</span>Semangat</button>
+        <button class="cheer-btn2" onclick="cheer('🎉')"><span class="em">🎉</span>Party</button>
+        <button class="cheer-btn2" onclick="cheer('❤️')"><span class="em">❤️</span>Cinta</button>
+      </div>
+    </div>
+
+    <div class="live-chat">
+      <div class="live-chat-header">
+        <div class="ttl">💬 Komentar Live</div>
+        <div class="live-indicator">LIVE</div>
+      </div>
+      <div class="chat-list" id="chatList">
+        <div class="chat-empty">Belum ada komentar. Mulai ngobrol!</div>
+      </div>
+      <div class="chat-form">
+        <input type="text" class="msg-in" id="chatMsg" placeholder="Tulis komentar sebagai Anonymous..." maxlength="200" onkeydown="if(event.key==='Enter')sendChat()">
+        <button class="send-btn" onclick="sendChat()">➤</button>
+      </div>
+    </div>
+
+    <div class="footer">Made By <strong>Alfieno</strong></div>
+  </div>
+
+  <!-- PANEL GAME -->
+  <div class="panel" id="panel-game">
+    <div class="card-box">
+      <div class="card-title">Mini Game</div>
+      <div class="card-desc">Pilih game untuk mengisi waktu.</div>
+      <div class="game-tabs">
+        <div class="game-tab active" onclick="switchGame('tap', this)">👆 Tap</div>
+        <div class="game-tab" onclick="switchGame('parlay', this)">🎯 Parlay</div>
+        <div class="game-tab" onclick="switchGame('memory', this)">🧠 Memory</div>
+      </div>
+
+      <div class="game-panel active" id="game-tap">
+        <div class="game-stats">
+          <div class="game-stat"><div class="lbl">Skor</div><div class="val" id="gScore">0</div></div>
+          <div class="game-stat"><div class="lbl">Terbaik</div><div class="val" id="gBest">0</div></div>
+        </div>
+        <div class="tap-area" id="tapArea" onclick="tapGame()">
+          <div class="big" id="tapIcon">👆</div>
+          <div class="txt" id="tapText">Ketuk untuk mulai</div>
+        </div>
+        <div class="game-timeleft">Sisa waktu: <strong id="gTime">10.0</strong>s</div>
+        <button class="btn-reset-game" onclick="resetTapGame()">Reset Game</button>
+      </div>
+
+      <div class="game-panel" id="game-parlay">
+        <div class="card-desc" style="text-align:center">Tebak skor akhir. Dinilai saat pertandingan selesai.</div>
+        <div class="parlay-live-score">
+          <div class="lbl">Skor Saat Ini</div>
+          <div class="sc" id="parlayLiveScore">0 : 0</div>
+        </div>
+        <div class="parlay-form">
+          <input type="number" min="0" max="99" class="parlay-input" id="parlayA" placeholder="0">
+          <span class="parlay-vs">:</span>
+          <input type="number" min="0" max="99" class="parlay-input" id="parlayB" placeholder="0">
+        </div>
+        <button class="parlay-btn" id="parlayBtn" onclick="submitParlay()">Kirim Tebakan</button>
+        <div class="parlay-result" id="parlayResult"></div>
+        <div class="parlay-my" id="parlayMy"></div>
+      </div>
+
+      <div class="game-panel" id="game-memory">
+        <div class="game-stats">
+          <div class="game-stat"><div class="lbl">Langkah</div><div class="val" id="memMoves">0</div></div>
+          <div class="game-stat"><div class="lbl">Pasangan</div><div class="val" id="memPairs">0/8</div></div>
+        </div>
+        <div class="memory-grid" id="memoryGrid"></div>
+        <button class="btn-reset-game" onclick="initMemory()">Ulangi Game</button>
+      </div>
+    </div>
+    <div class="footer">Made By <strong>Alfieno</strong></div>
+  </div>
+
+  <!-- PANEL SUARA -->
+  <div class="panel" id="panel-sound">
+    <div class="sound-box">
+      <div class="sound-row"><div><div class="lbl">Efek Suara</div><div class="sub">Bunyi saat sorak & klik</div></div><label class="switch"><input type="checkbox" id="toggleSound" checked><span class="slider-sw"></span></label></div>
+      <div class="sound-row"><div><div class="lbl">Suara Sorakan</div><div class="sub">Bunyi sorakan penonton</div></div><label class="switch"><input type="checkbox" id="toggleCheer" checked><span class="slider-sw"></span></label></div>
+      <div class="sound-row"><div><div class="lbl">Notifikasi Skor</div><div class="sub">Bunyi saat skor berubah</div></div><label class="switch"><input type="checkbox" id="toggleScore" checked><span class="slider-sw"></span></label></div>
+      <div class="sound-row"><div><div class="lbl">Suara Chat</div><div class="sub">Bunyi saat komentar masuk</div></div><label class="switch"><input type="checkbox" id="toggleChat" checked><span class="slider-sw"></span></label></div>
+    </div>
+    <div class="footer">Made By <strong>Alfieno</strong></div>
+  </div>
+
+</div>
+
+<div class="bottom-nav">
+  <div class="nav-item active" onclick="switchPanel('score', this)"><span class="ico">🏆</span>Skor</div>
+  <div class="nav-item" onclick="switchPanel('game', this)"><span class="ico">🎮</span>Game</div>
+  <div class="nav-item" onclick="switchPanel('sound', this)"><span class="ico">🔊</span>Suara</div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getDatabase, ref, onValue, push, set, query, limitToLast, serverTimestamp, remove } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBz_-9_wGpxFvoOV7mjG-bo9R7cBDLPh1c",
+  authDomain: "lvsc-d619e.firebaseapp.com",
+  databaseURL: "https://lvsc-d619e-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "lvsc-d619e",
+  storageBucket: "lvsc-d619e.firebasestorage.app",
+  messagingSenderId: "1093402057198",
+  appId: "1:1093402057198:web:f1d07b2e435569120c16ff",
+  measurementId: "G-MYN6J1HLKD"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+const scoreRef = ref(db, 'livescore');
+const chatRef = ref(db, 'chat');
+const parlayRef = ref(db, 'parlay');
+
+const ADMIN_ID = 'admin_fixed';
+
+window.addEventListener('load', () => {
+  setTimeout(() => document.getElementById('loading').classList.add('hide'), 1800);
+});
+
+const el = {
+  tournamentName: document.getElementById('tournamentName'),
+  nameA: document.getElementById('nameA'),
+  nameB: document.getElementById('nameB'),
+  scoreA: document.getElementById('scoreA'),
+  scoreB: document.getElementById('scoreB'),
+  crestA: document.getElementById('crestA'),
+  crestB: document.getElementById('crestB'),
+  timer: document.getElementById('timer'),
+  liveDot: document.getElementById('liveDot'),
+  liveLabel: document.getElementById('liveLabel')
+};
+
+const Sound = {
+  ctx: null,
+  enabled: true, cheerEnabled: true, scoreEnabled: true, chatEnabled: true,
+  init() { if (!this.ctx) { try { this.ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e) {} } },
+  beep(freq = 600, dur = 0.1, type = 'sine', vol = 0.15) {
+    if (!this.enabled || !this.ctx) return;
+    const o = this.ctx.createOscillator(); const g = this.ctx.createGain();
+    o.type = type; o.frequency.value = freq; g.gain.value = vol;
+    o.connect(g).connect(this.ctx.destination); o.start();
+    g.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + dur);
+    o.stop(this.ctx.currentTime + dur);
+  },
+  click() { this.beep(400, 0.06, 'square', 0.08); },
+  scoreChange() { if (!this.scoreEnabled) return; this.beep(500, 0.08, 'triangle', 0.12); setTimeout(() => this.beep(750, 0.12, 'triangle', 0.12), 90); },
+  goal() {
+    if (!this.scoreEnabled) return;
+    [523,659,784,1046,1318].forEach((n,i) => setTimeout(() => this.beep(n, 0.18, 'sine', 0.13), i*90));
+    setTimeout(() => this.beep(150, 0.25, 'sine', 0.15), 50);
+  },
+  cheer() { if (!this.cheerEnabled) return; [523,659,784,1046].forEach((n,i) => setTimeout(() => this.beep(n, 0.15, 'sine', 0.1), i*80)); },
+  chatPing() { if (!this.chatEnabled) return; this.beep(880, 0.06, 'sine', 0.07); }
+};
+
+document.body.addEventListener('click', () => Sound.init(), { once: true });
+document.body.addEventListener('touchstart', () => Sound.init(), { once: true });
+
+function switchPanel(name, elem) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('panel-' + name).classList.add('active');
+  document.querySelectorAll('.bottom-nav .nav-item').forEach(n => n.classList.remove('active'));
+  elem.classList.add('active');
+  Sound.click();
+}
+window.switchPanel = switchPanel;
+
+function setCrest(e, name) {
+  const n = (name || '').trim();
+  e.textContent = n ? n.charAt(0).toUpperCase() : '?';
+}
+
+function fmtTime(sec) {
+  const s = parseInt(sec) || 0;
+  const m = String(Math.floor(s / 60)).padStart(2, '0');
+  const ss = String(s % 60).padStart(2, '0');
+  return m + ':' + ss;
+}
+
+let lastScores = { a: -1, b: -1 };
+let currentData = { scoreA: 0, scoreB: 0, matchStatus: 'live', nameA: '', nameB: '' };
+
+onValue(scoreRef, (snapshot) => {
+  const d = snapshot.val();
+  if (!d) {
+    el.liveDot.className = 'dot off';
+    el.liveLabel.textContent = 'OFFLINE';
+    return;
+  }
+
+  currentData = d;
+
+  el.tournamentName.textContent = d.tournament || 'Pertandingan';
+  el.nameA.textContent = d.nameA || 'Tim A';
+  el.nameB.textContent = d.nameB || 'Tim B';
+  setCrest(el.crestA, d.nameA);
+  setCrest(el.crestB, d.nameB);
+  el.scoreA.textContent = d.scoreA || 0;
+  el.scoreB.textContent = d.scoreB || 0;
+  el.timer.textContent = fmtTime(d.seconds);
+
+  // Update parlay live score
+  document.getElementById('parlayLiveScore').textContent = (d.scoreA || 0) + ' : ' + (d.scoreB || 0);
+
+  // Badge status
+  if (d.matchStatus === 'finished') {
+    el.liveDot.className = 'dot finished';
+    el.liveLabel.textContent = 'SELESAI';
+  } else {
+    el.liveDot.className = 'dot';
+    el.liveLabel.textContent = 'LIVE';
+  }
+
+  // Deteksi skor berubah
+  if (lastScores.a !== -1) {
+    if ((d.scoreA || 0) > lastScores.a) goalAnimation(el.scoreA);
+    else if ((d.scoreB || 0) > lastScores.b) goalAnimation(el.scoreB);
+    else if ((d.scoreA || 0) !== lastScores.a || (d.scoreB || 0) !== lastScores.b) Sound.scoreChange();
+  }
+  lastScores.a = d.scoreA || 0;
+  lastScores.b = d.scoreB || 0;
+
+  // Update tampilan parlay jika ada
+  renderParlayState();
+}, () => {
+  el.liveDot.className = 'dot off';
+  el.liveLabel.textContent = 'OFFLINE';
+});
+
+function goalAnimation(scoreEl) {
+  scoreEl.classList.add('pop', 'flash-bg');
+  setTimeout(() => scoreEl.classList.remove('pop'), 350);
+  setTimeout(() => scoreEl.classList.remove('flash-bg'), 700);
+  Sound.goal();
+  const rect = scoreEl.getBoundingClientRect();
+  const targetX = rect.left + rect.width / 2;
+  const targetY = rect.top + rect.height / 2;
+  const ball = document.createElement('div');
+  ball.className = 'ball-fly'; ball.textContent = '⚽';
+  ball.style.left = targetX + 'px'; ball.style.top = '100vh';
+  ball.style.transform = 'translate(-50%, -50%) scale(1)'; ball.style.opacity = '1';
+  document.body.appendChild(ball);
+  requestAnimationFrame(() => {
+    ball.style.transform = `translate(-50%, -50%) translateY(-${window.innerHeight - targetY}px) scale(0.7)`;
+    ball.style.opacity = '0.2';
+  });
+  setTimeout(() => { ball.remove(); burstParticles(targetX, targetY); }, 550);
+}
+
+function burstParticles(x, y) {
+  const emojis = ['⚽','✨','⭐','🎉','💥'];
+  const count = 14;
+  for (let i = 0; i < count; i++) {
+    const p = document.createElement('div');
+    p.className = 'particle';
+    p.textContent = emojis[Math.floor(Math.random() * emojis.length)];
+    p.style.left = x + 'px'; p.style.top = y + 'px';
+    const angle = (Math.PI * 2 * i) / count + (Math.random() * 0.5);
+    const dist = 60 + Math.random() * 90;
+    p.style.setProperty('--dx', Math.cos(angle) * dist + 'px');
+    p.style.setProperty('--dy', Math.sin(angle) * dist - 30 + 'px');
+    p.style.animationDelay = (Math.random() * 0.1) + 's';
+    document.body.appendChild(p);
+    setTimeout(() => p.remove(), 1100);
+  }
+}
+
+function cheer(emoji) {
+  Sound.init(); Sound.cheer();
+  for (let i = 0; i < 6; i++) {
+    setTimeout(() => {
+      const span = document.createElement('span');
+      span.className = 'emoji-float'; span.textContent = emoji;
+      span.style.left = (10 + Math.random() * 80) + '%';
+      span.style.bottom = '80px';
+      span.style.animationDelay = (Math.random() * 0.2) + 's';
+      document.body.appendChild(span);
+      setTimeout(() => span.remove(), 1400);
+    }, i * 60);
+  }
+}
+window.cheer = cheer;
+
+function switchGame(name, elem) {
+  document.querySelectorAll('.game-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('game-' + name).classList.add('active');
+  document.querySelectorAll('.game-tab').forEach(t => t.classList.remove('active'));
+  elem.classList.add('active');
+  Sound.click();
+  if (name === 'memory' && !memoryInitialized) initMemory();
+}
+window.switchGame = switchGame;
+
+/* ===== TAP GAME ===== */
+let gRunning = false, gScore = 0, gTime = 10.0, gInterval = null;
+let gBest = parseInt(localStorage.getItem('tap_best') || '0');
+document.getElementById('gBest').textContent = gBest;
+const tapArea = document.getElementById('tapArea');
+const tapIcon = document.getElementById('tapIcon');
+const tapText = document.getElementById('tapText');
+const gScoreEl = document.getElementById('gScore');
+const gTimeEl = document.getElementById('gTime');
+
+function tapGame() {
+  Sound.init();
+  if (!gRunning) { startTapGame(); return; }
+  gScore++; gScoreEl.textContent = gScore;
+  Sound.beep(600 + Math.min(gScore * 8, 600), 0.04, 'square', 0.06);
+  tapIcon.style.transform = 'scale(1.3)';
+  setTimeout(() => tapIcon.style.transform = 'scale(1)', 80);
+}
+function startTapGame() {
+  gRunning = true; gScore = 0; gTime = 10.0;
+  gScoreEl.textContent = '0'; gTimeEl.textContent = '10.0';
+  tapIcon.textContent = '🔥'; tapText.textContent = 'TAP CEPAT!';
+  tapArea.style.background = '#fff4d6';
+  clearInterval(gInterval);
+  gInterval = setInterval(() => {
+    gTime -= 0.1;
+    if (gTime <= 0) endTapGame();
+    else gTimeEl.textContent = gTime.toFixed(1);
+  }, 100);
+}
+function endTapGame() {
+  clearInterval(gInterval); gRunning = false;
+  gTimeEl.textContent = '0.0';
+  tapIcon.textContent = '🏁'; tapText.textContent = 'Selesai! Tap untuk main lagi';
+  tapArea.style.background = '#faf8f3';
+  if (gScore > gBest) { gBest = gScore; localStorage.setItem('tap_best', gBest); document.getElementById('gBest').textContent = gBest; }
+  Sound.beep(523, 0.1); setTimeout(() => Sound.beep(659, 0.1), 120); setTimeout(() => Sound.beep(784, 0.2), 240);
+}
+function resetTapGame() {
+  clearInterval(gInterval); gRunning = false; gScore = 0; gTime = 10.0;
+  gScoreEl.textContent = '0'; gTimeEl.textContent = '10.0';
+  tapIcon.textContent = '👆'; tapText.textContent = 'Ketuk untuk mulai';
+  tapArea.style.background = '#faf8f3'; Sound.click();
+}
+window.tapGame = tapGame;
+window.resetTapGame = resetTapGame;
+
+/* ===== PARLAY ===== */
+let myId = localStorage.getItem('chat_id');
+if (!myId) {
+  myId = 'u_' + Math.random().toString(36).slice(2, 9);
+  localStorage.setItem('chat_id', myId);
+}
+let myParlayKey = null;
+let parlayData = null;
+
+// Listen parlay
+onValue(parlayRef, (snapshot) => {
+  parlayData = snapshot.val();
+  renderParlayState();
+});
+
+function renderParlayState() {
+  const btn = document.getElementById('parlayBtn');
+  const result = document.getElementById('parlayResult');
+  const myInfo = document.getElementById('parlayMy');
+
+  if (!currentData || currentData.matchStatus === 'finished') {
+    // Match selesai
+    btn.disabled = true;
+    btn.textContent = 'Pertandingan Selesai';
+
+    const myP = findMyParlay();
+    if (myP) {
+      const scoreA = currentData.scoreA || 0;
+      const scoreB = currentData.scoreB || 0;
+      const isWin = (parseInt(myP.guessA) === scoreA) && (parseInt(myP.guessB) === scoreB);
+      if (isWin) {
+        result.className = 'parlay-result show win';
+        result.innerHTML = '🏆 <strong>MENANG!</strong><br>Tebakan kamu: ' + myP.guessA + ' : ' + myP.guessB + '<br>Skor final: ' + scoreA + ' : ' + scoreB;
+        Sound.goal();
+      } else {
+        result.className = 'parlay-result show lose';
+        result.innerHTML = '❌ <strong>KALAH</strong><br>Tebakan kamu: ' + myP.guessA + ' : ' + myP.guessB + '<br>Skor final: ' + scoreA + ' : ' + scoreB;
+      }
+      myInfo.textContent = 'Tebakan tersimpan.';
+    } else {
+      result.className = 'parlay-result show wait';
+      result.textContent = 'Pertandingan selesai. Kamu tidak submit tebakan.';
+      myInfo.textContent = '';
+    }
+    document.getElementById('parlayA').disabled = true;
+    document.getElementById('parlayB').disabled = true;
+    return;
+  }
+
+  // Match live
+  btn.disabled = false;
+  btn.textContent = findMyParlay() ? 'Ubah Tebakan' : 'Kirim Tebakan';
+  document.getElementById('parlayA').disabled = false;
+  document.getElementById('parlayB').disabled = false;
+
+  const myP = findMyParlay();
+  if (myP) {
+    document.getElementById('parlayA').value = myP.guessA;
+    document.getElementById('parlayB').value = myP.guessB;
+    myInfo.innerHTML = 'Tebakan kamu: <strong>' + myP.guessA + ' : ' + myP.guessB + '</strong> (menunggu hasil)';
+    result.className = 'parlay-result show wait';
+    result.textContent = 'Tebakan tersimpan. Hasil akan muncul saat pertandingan selesai.';
+  } else {
+    myInfo.textContent = 'Belum submit tebakan.';
+    result.className = 'parlay-result';
+    result.textContent = '';
+  }
+}
+
+function findMyParlay() {
+  if (!parlayData) return null;
+  for (const key in parlayData) {
+    if (parlayData[key].uid === myId) {
+      myParlayKey = key;
+      return parlayData[key];
+    }
+  }
+  return null;
+}
+
+function submitParlay() {
+  if (!currentData || currentData.matchStatus === 'finished') {
+    alert('Pertandingan sudah selesai.');
+    return;
+  }
+  const a = parseInt(document.getElementById('parlayA').value);
+  const b = parseInt(document.getElementById('parlayB').value);
+  if (isNaN(a) || isNaN(b) || a < 0 || b < 0) {
+    alert('Masukkan angka untuk kedua tim.');
+    return;
+  }
+  const existing = findMyParlay();
+  const data = { name: 'Anonymous', uid: myId, guessA: a, guessB: b, time: Date.now() };
+
+  if (existing && myParlayKey) {
+    // Update
+    set(ref(db, 'parlay/' + myParlayKey), data).then(() => {
+      Sound.beep(720, 0.08, 'sine', 0.08);
+    }).catch(err => alert('Gagal simpan: ' + err.message));
+  } else {
+    // Baru
+    push(parlayRef, data).then(() => {
+      Sound.beep(720, 0.08, 'sine', 0.08);
+    }).catch(err => alert('Gagal simpan: ' + err.message));
+  }
+}
+window.submitParlay = submitParlay;
+
+/* ===== MEMORY ===== */
+let memoryInitialized = false;
+let memFirst = null, memSecond = null, memLock = false, memMoves = 0, memPairs = 0;
+const memIcons = ['⚽','🏀','🎾','🏐','🏈','🎱','🏓','🥊'];
+function initMemory() {
+  memoryInitialized = true;
+  const grid = document.getElementById('memoryGrid');
+  grid.innerHTML = '';
+  memFirst = memSecond = null; memLock = false; memMoves = 0; memPairs = 0;
+  document.getElementById('memMoves').textContent = '0';
+  document.getElementById('memPairs').textContent = '0/8';
+  const deck = [...memIcons, ...memIcons].sort(() => Math.random() - 0.5);
+  deck.forEach(icon => {
+    const card = document.createElement('div');
+    card.className = 'mem-card'; card.dataset.icon = icon;
+    card.addEventListener('click', () => flipMemory(card));
+    grid.appendChild(card);
+  });
+}
+function flipMemory(card) {
+  if (memLock) return;
+  if (card.classList.contains('flipped') || card.classList.contains('matched')) return;
+  Sound.beep(700, 0.05, 'sine', 0.06);
+  card.classList.add('flipped'); card.textContent = card.dataset.icon;
+  if (!memFirst) { memFirst = card; return; }
+  memSecond = card; memMoves++;
+  document.getElementById('memMoves').textContent = memMoves;
+  memLock = true;
+  if (memFirst.dataset.icon === memSecond.dataset.icon) {
+    setTimeout(() => {
+      memFirst.classList.add('matched'); memSecond.classList.add('matched');
+      Sound.beep(900, 0.1, 'triangle', 0.1);
+      memPairs++; document.getElementById('memPairs').textContent = memPairs + '/8';
+      if (memPairs === 8) setTimeout(() => { Sound.goal(); alert('🎉 Selesai dalam ' + memMoves + ' langkah!'); }, 400);
+      resetMemPick();
+    }, 400);
+  } else {
+    setTimeout(() => {
+      memFirst.classList.remove('flipped'); memSecond.classList.remove('flipped');
+      memFirst.textContent = ''; memSecond.textContent = '';
+      Sound.beep(250, 0.12, 'sawtooth', 0.08);
+      resetMemPick();
+    }, 700);
+  }
+}
+function resetMemPick() { memFirst = memSecond = null; memLock = false; }
+window.initMemory = initMemory;
+
+/* ===== CHAT ===== */
+const chatList = document.getElementById('chatList');
+const chatMsg = document.getElementById('chatMsg');
+let chatFirstLoad = true;
+
+function sendChat() {
+  const text = chatMsg.value.trim();
+  if (!text) return;
+  push(chatRef, {
+    name: 'Anonymous',
+    text: text.slice(0, 200),
+    uid: myId,
+    time: serverTimestamp()
+  }).then(() => {
+    chatMsg.value = ''; chatMsg.focus();
+    Sound.beep(720, 0.06, 'sine', 0.07);
+  }).catch((err) => {
+    alert('Gagal kirim chat: ' + err.message + '\n\nBuka Firebase Console → Realtime Database → Rules, pastikan:\n"chat": { ".read": true, ".write": true }\n\nKlik Publish.');
+  });
+}
+window.sendChat = sendChat;
+
+const chatQuery = query(chatRef, limitToLast(40));
+onValue(chatQuery, (snapshot) => {
+  const data = snapshot.val();
+  chatList.innerHTML = '';
+  if (!data) {
+    chatList.innerHTML = '<div class="chat-empty">Belum ada komentar. Mulai ngobrol!</div>';
+    chatFirstLoad = false;
+    return;
+  }
+  const msgs = Object.entries(data).map(([k, v]) => ({ ...v, id: k })).sort((a, b) => (a.time || 0) - (b.time || 0));
+  const wasNearBottom = chatList.scrollHeight - chatList.scrollTop - chatList.clientHeight < 60;
+  const lastCount = chatList.dataset.lastCount ? parseInt(chatList.dataset.lastCount) : 0;
+
+  msgs.forEach(msg => {
+    const div = document.createElement('div');
+    const isAdmin = msg.uid === ADMIN_ID;
+    div.className = 'chat-item' + (isAdmin ? ' is-admin' : '');
+    const time = msg.time ? new Date(msg.time).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '';
+    div.innerHTML = `
+      <span class="uname">${escapeHtml(msg.name || 'Anonymous')}:</span>
+      <span class="utext">${escapeHtml(msg.text)}</span>
+      <span class="utime">${time}</span>
+    `;
+    chatList.appendChild(div);
+  });
+
+  if (chatFirstLoad || wasNearBottom) chatList.scrollTop = chatList.scrollHeight;
+  if (!chatFirstLoad && msgs.length > lastCount) {
+    const newest = msgs[msgs.length - 1];
+    if (newest.uid !== myId) Sound.chatPing();
+  }
+  chatList.dataset.lastCount = msgs.length;
+  chatFirstLoad = false;
+}, () => { chatList.innerHTML = '<div class="chat-empty">Gagal memuat chat.</div>'; });
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' })[c]);
+}
+
+document.getElementById('toggleSound').addEventListener('change', e => { Sound.enabled = e.target.checked; });
+document.getElementById('toggleCheer').addEventListener('change', e => { Sound.cheerEnabled = e.target.checked; });
+document.getElementById('toggleScore').addEventListener('change', e => { Sound.scoreEnabled = e.target.checked; });
+document.getElementById('toggleChat').addEventListener('change', e => { Sound.chatEnabled = e.target.checked; });
+</script>
+</body>
+</html>
